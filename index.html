@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>T'way Air · 지연결항 분석</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --red:#E8192C;--red-lt:#FFF0F1;--red-md:#FFD6D9;
+  --ink:#111318;--ink2:#3C4050;--ink3:#6B7280;
+  --line:#E8EAED;--line2:#F3F4F6;
+  --bg:#F8F9FA;--white:#FFFFFF;
+  --green:#16A34A;--amber:#D97706;--blue:#2563EB;
+  --r:12px;--r2:8px;
+  --f:'Figtree',sans-serif;
+  --fk:'Noto Sans KR',sans-serif;
+}
+body{font-family:var(--f);background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* ── 공통 ── */
+.page{max-width:1400px;margin:0 auto;padding:28px 24px 72px}
+.hidden{display:none!important}
+.mono{font-family:'Courier New',monospace;font-size:.85em}
+
+/* ── 헤더 ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--white);
+  border-bottom:1px solid var(--line);
+  padding:0 28px;height:60px;
+  position:sticky;top:0;z-index:100;
+}
+.h-brand{display:flex;align-items:center;gap:14px}
+.h-logo{
+  background:var(--red);color:#fff;
+  font-family:var(--f);font-weight:800;font-size:14px;
+  letter-spacing:1.5px;padding:7px 12px;border-radius:6px;
+}
+.h-name{font-weight:700;font-size:16px;letter-spacing:-.3px}
+.h-sub{font-size:11px;color:var(--ink3);margin-top:1px}
+.h-right{display:flex;align-items:center;gap:20px}
+.h-stat{text-align:right;font-size:12px;color:var(--ink3);line-height:1.6}
+.h-stat b{color:var(--ink);font-size:14px;font-weight:700}
+.h-btn{
+  background:var(--red);color:#fff;border:none;
+  padding:9px 18px;border-radius:var(--r2);
+  font-family:var(--f);font-size:13px;font-weight:600;cursor:pointer;
+  transition:opacity .15s;white-space:nowrap;
+}
+.h-btn:hover{opacity:.85}
+
+/* ── 업로드 화면 ── */
+.upload-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100vh - 60px);padding:40px 20px;
+}
+.drop-box{
+  background:var(--white);
+  border:2px dashed var(--line);
+  border-radius:20px;
+  padding:64px 48px;
+  text-align:center;
+  max-width:520px;width:100%;
+  cursor:pointer;
+  transition:border-color .2s,background .2s,transform .15s;
+  box-shadow:0 2px 20px rgba(0,0,0,.04);
+}
+.drop-box:hover,.drop-box.over{
+  border-color:var(--red);
+  background:#FFFAFA;
+  transform:translateY(-2px);
+  box-shadow:0 8px 32px rgba(232,25,44,.1);
+}
+.drop-icon{font-size:56px;margin-bottom:20px;display:block}
+.drop-title{font-size:20px;font-weight:700;letter-spacing:-.4px;margin-bottom:8px}
+.drop-desc{font-size:13px;color:var(--ink3);line-height:1.7;margin-bottom:24px}
+.drop-path{
+  display:inline-block;background:var(--line2);
+  border-radius:6px;padding:6px 12px;
+  font-size:11px;color:var(--ink3);font-family:'Courier New',monospace;
+  margin-bottom:28px;word-break:break-all;line-height:1.5;
+}
+.pick-btn{
+  background:var(--red);color:#fff;border:none;
+  padding:14px 32px;border-radius:var(--r2);
+  font-family:var(--f);font-size:15px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 16px rgba(232,25,44,.3);
+  transition:opacity .15s,transform .15s;
+}
+.pick-btn:hover{opacity:.9;transform:translateY(-1px)}
+input[type=file]{display:none}
+
+/* ── KPI ── */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
+.kpi{
+  background:var(--white);border:1px solid var(--line);
+  border-radius:var(--r);padding:20px 18px;
+  position:relative;overflow:hidden;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);
+  transition:box-shadow .15s,transform .15s;
+}
+.kpi:hover{box-shadow:0 4px 16px rgba(0,0,0,.07);transform:translateY(-2px)}
+.kpi-bar{
+  position:absolute;top:0;left:0;right:0;height:3px;
+  border-radius:var(--r) var(--r) 0 0;
+  background:var(--kc,var(--red));
+}
+.kpi-n{font-family:var(--f);font-size:36px;font-weight:800;letter-spacing:-1.5px;color:var(--kc,var(--ink));line-height:1}
+.kpi-l{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.6px;margin-top:8px}
+.kpi-s{font-size:11px;color:var(--line);margin-top:2px;color:#9CA3AF}
+
+/* ── 차트 섹션 ── */
+.sec-hd{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:1px;text-transform:uppercase;margin:28px 0 12px}
+.charts-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.charts-3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:16px;margin-bottom:24px}
+
+.card{
+  background:var(--white);border:1px solid var(--line);
+  border-radius:var(--r);padding:20px 20px 16px;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);
+}
+.card-hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:700;letter-spacing:-.2px}
+.card-tag{font-size:11px;color:var(--ink3);background:var(--line2);padding:3px 8px;border-radius:20px}
+.cv{position:relative}
+.cv-220{height:220px}
+.cv-260{height:260px}
+.cv-300{height:300px}
+
+/* ── 필터 ── */
+.filter-row{
+  background:var(--white);border:1px solid var(--line);
+  border-radius:var(--r);padding:14px 16px;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  margin-bottom:12px;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);
+}
+.filter-row input,.filter-row select{
+  border:1px solid var(--line);border-radius:var(--r2);
+  padding:8px 12px;font-size:12px;font-family:var(--f);
+  color:var(--ink);background:var(--bg);outline:none;
+}
+.filter-row input{flex:1;min-width:200px}
+.filter-row input:focus,.filter-row select:focus{border-color:var(--blue)}
+.fr-cnt{font-size:12px;color:var(--ink3);margin-left:auto;font-weight:500}
+.rst-btn{
+  background:none;border:1px solid var(--line);color:var(--ink3);
+  padding:7px 12px;border-radius:var(--r2);font-size:12px;font-family:var(--f);cursor:pointer;
+}
+.rst-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ── 테이블 ── */
+.tbl-wrap{
+  background:var(--white);border:1px solid var(--line);
+  border-radius:var(--r);overflow:auto;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);
+}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:980px}
+thead{background:var(--bg);border-bottom:2px solid var(--line)}
+th{
+  padding:11px 14px;text-align:left;
+  font-size:10px;font-weight:700;color:var(--ink3);
+  letter-spacing:.8px;text-transform:uppercase;
+  white-space:nowrap;cursor:pointer;user-select:none;
+}
+th:hover{color:var(--ink)}
+th.on{color:var(--blue)}
+tbody tr{border-bottom:1px solid var(--line2);transition:background .1s}
+tbody tr:hover{background:#F9FAFB}
+tbody tr:last-child{border:none}
+td{padding:11px 14px;vertical-align:middle}
+.tfoot{display:flex;justify-content:space-between;padding:10px 16px;font-size:11px;color:var(--ink3);border-top:1px solid var(--line)}
+
+/* 배지들 */
+.pill{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10.5px;font-weight:700;white-space:nowrap}
+.pill+.pill{margin-left:3px}
+.TC{background:#FEE2E2;color:#B91C1C}
+.TD{background:#FFEDD5;color:#C2410C}
+.TR{background:#FEF3C7;color:#92400E}
+.TN{background:#DBEAFE;color:#1D4ED8}
+.RO{background:#EDE9FE;color:#6D28D9}
+.FM{background:#D1FAE5;color:#065F46}
+.XX{background:var(--line2);color:var(--ink3)}
+
+.tp{display:inline-block;padding:3px 8px;border-radius:5px;font-size:10.5px;font-weight:700}
+.B738{background:#DBEAFE;color:#1D4ED8}
+.B38M{background:#D1FAE5;color:#065F46}
+.A332{background:#EDE9FE;color:#6D28D9}
+.A333{background:#FEF3C7;color:#92400E}
+.B777{background:#FEE2E2;color:#B91C1C}
+
+.ata-t{
+  font-family:'Courier New',monospace;font-size:10px;
+  background:var(--line2);border:1px solid var(--line);
+  border-radius:4px;padding:2px 6px;color:var(--ink2);white-space:nowrap;
+}
+.ata-n{font-size:10px;color:var(--ink3);margin-top:2px}
+.d-long{color:#B91C1C;font-weight:700}
+.d-mid{color:#C2410C;font-weight:600}
+.desc-c{max-width:260px;font-size:11.5px;color:var(--ink3);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.45}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- ── 헤더 ── -->
+<header>
+  <div class="h-brand">
+    <div class="h-logo">T'WAY</div>
+    <div>
+      <div class="h-name">지연결항 분석 대시보드</div>
+      <div class="h-sub">MCC · Delay &amp; Cancellation Analysis</div>
+    </div>
+  </div>
+  <div class="h-right">
+    <div class="h-stat hidden" id="hStat">
+      <b id="hTotal">—</b>건 &nbsp;|&nbsp; <span id="hYear">—</span>
+    </div>
+    <button class="h-btn hidden" id="hBtn"
+      onclick="document.getElementById('fi').click()">📁 파일 교체</button>
+  </div>
+</header>
+<input type="file" id="fi" accept=".xlsx,.xls" onchange="loadFile(this.files[0])">
+
+<!-- ── 업로드 화면 ── -->
+<div id="upScreen">
+<div class="upload-screen">
+  <div class="drop-box" id="dropBox"
+       onclick="document.getElementById('fi').click()">
+    <span class="drop-icon">📊</span>
+    <div class="drop-title">지연결항 파일을 불러오세요</div>
+    <div class="drop-desc">
+      Excel 파일을 여기에 드래그하거나<br>아래 버튼을 눌러 직접 선택하세요
+    </div>
+    <div class="drop-path">OneDrive → 티웨이항공 → 지연결항 → 2026_지연결항.xlsx</div>
+    <button class="pick-btn"
+      onclick="event.stopPropagation();document.getElementById('fi').click()">
+      파일 선택하기
+    </button>
+  </div>
+</div>
+</div>
+
+<!-- ── 대시보드 ── -->
+<div id="dash" class="hidden">
+<div class="page">
+
+  <!-- KPI -->
+  <div class="sec-hd">Overview</div>
+  <div class="kpi-row">
+    <div class="kpi" style="--kc:var(--red)">
+      <div class="kpi-bar"></div>
+      <div class="kpi-n" id="kTotal">0</div>
+      <div class="kpi-l">총 건수</div>
+      <div class="kpi-s">전체 지연결항</div>
+    </div>
+    <div class="kpi" style="--kc:#E06820">
+      <div class="kpi-bar"></div>
+      <div class="kpi-n" id="kTc">0</div>
+      <div class="kpi-l">TC / TD / TR</div>
+      <div class="kpi-s">15분 초과 기술지연</div>
+    </div>
+    <div class="kpi" style="--kc:var(--blue)">
+      <div class="kpi-bar"></div>
+      <div class="kpi-n" id="kEtc">0</div>
+      <div class="kpi-l">외 코드</div>
+      <div class="kpi-s">TN 등 기타</div>
+    </div>
+    <div class="kpi" style="--kc:var(--amber)">
+      <div class="kpi-bar"></div>
+      <div class="kpi-n" id="kAta">—</div>
+      <div class="kpi-l">Top ATA</div>
+      <div class="kpi-s" id="kAtaS">—</div>
+    </div>
+    <div class="kpi" style="--kc:var(--green)">
+      <div class="kpi-bar"></div>
+      <div class="kpi-n" id="kCode">—</div>
+      <div class="kpi-l">Top DLY Code</div>
+      <div class="kpi-s" id="kCodeS">—</div>
+    </div>
+  </div>
+
+  <!-- Charts Row 1 -->
+  <div class="sec-hd">Charts</div>
+  <div class="charts-2">
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">월별 지연 건수</span>
+        <span class="card-tag">TC/TD/TR · 외코드</span>
+      </div>
+      <div class="cv cv-220"><canvas id="cM"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">DLY 코드 분포</span>
+        <span class="card-tag">Primary Code 기준</span>
+      </div>
+      <div class="cv cv-220"><canvas id="cD"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2 -->
+  <div class="charts-3">
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">ATA 챕터 TOP 10</span>
+        <span class="card-tag">발생 빈도순</span>
+      </div>
+      <div class="cv cv-300"><canvas id="cA"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">기종별 발생</span>
+        <span class="card-tag">Aircraft Type</span>
+      </div>
+      <div class="cv cv-300"><canvas id="cT"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hd">
+        <span class="card-title">코드 × 월 추이</span>
+        <span class="card-tag">Top 5 코드</span>
+      </div>
+      <div class="cv cv-300"><canvas id="cL"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Filter + Table -->
+  <div class="sec-hd">Detail Log</div>
+  <div class="filter-row">
+    <input type="text" id="fSrc" placeholder="✦  편명 · 기체번호 · 결함내용 검색..." oninput="applyF()">
+    <select id="fSh" onchange="applyF()">
+      <option value="">전체 시트</option>
+      <option value="TC/TD/TR">TC / TD / TR</option>
+      <option value="외코드">외 코드</option>
+    </select>
+    <select id="fMo" onchange="applyF()"><option value="">전체 월</option></select>
+    <select id="fTy" onchange="applyF()"><option value="">전체 기종</option></select>
+    <select id="fCo" onchange="applyF()"><option value="">전체 DLY코드</option></select>
+    <button class="rst-btn" onclick="resetF()">✕ 초기화</button>
+    <span class="fr-cnt" id="frCnt"></span>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="srt('date')" id="th-date" class="on">DATE ▲</th>
+          <th onclick="srt('type')" id="th-type">기종 ↕</th>
+          <th onclick="srt('ac')"   id="th-ac">A/C ↕</th>
+          <th>ATA</th>
+          <th onclick="srt('flt')"  id="th-flt">FLT ↕</th>
+          <th>STA</th>
+          <th onclick="srt('dly')"  id="th-dly">DLY ↕</th>
+          <th>DLY CODE</th>
+          <th>시트</th>
+          <th>결함 내용</th>
+        </tr>
+      </thead>
+      <tbody id="tBody"></tbody>
+    </table>
+    <div class="tfoot">
+      <span id="tFoot">—</span>
+      <span>T'way Air MCC · 지연결항 분석 대시보드</span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+/* ──────────────────────────────
+   ATA 이름 맵
+────────────────────────────── */
+const AN={21:'Air Conditioning',22:'Auto Flight',23:'Communications',24:'Electrical',25:'Furnishings',26:'Fire Protection',27:'Flight Controls',28:'Fuel',29:'Hydraulic',30:'Ice & Rain',31:'Instruments',32:'Landing Gear',33:'Lights',34:'Navigation',35:'Oxygen',36:'Pneumatics',38:'Water/Waste',49:'APU',52:'Doors',53:'Fuselage',55:'Stabilizers',56:'Windows',57:'Wings',70:'Power Plant',71:'Power Plant',72:'Engine Turbine',73:'Engine Fuel Ctrl',74:'Ignition',75:'Bleed Air',76:'Engine Controls',77:'Engine Indicating',78:'Exhaust',79:'Oil',80:'Starting'};
+
+/* ──────────────────────────────
+   DLY code 색상
+────────────────────────────── */
+const CP={TC:'#EF4444',TD:'#F97316',TR:'#EAB308',TN:'#3B82F6',RO:'#8B5CF6',FM:'#10B981',AM:'#9CA3AF',NA:'#D1D5DB',NP:'#E5E7EB'};
+const CC=(c)=>CP[c]||'#9CA3AF';
+
+/* ──────────────────────────────
+   State
+────────────────────────────── */
+let ALL=[], filtered=[], charts={}, sortState={k:'date',a:true};
+
+/* ──────────────────────────────
+   Drag & Drop
+────────────────────────────── */
+const db=document.getElementById('dropBox');
+db.addEventListener('dragover',e=>{e.preventDefault();db.classList.add('over')});
+db.addEventListener('dragleave',()=>db.classList.remove('over'));
+db.addEventListener('drop',e=>{e.preventDefault();db.classList.remove('over');const f=e.dataTransfer.files[0];if(f)loadFile(f)});
+
+/* ──────────────────────────────
+   Load File
+────────────────────────────── */
+function loadFile(file){
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+      ALL=[];
+      wb.SheetNames.forEach(sn=>{
+        const isTC=sn.includes('TC');
+        const label=isTC?'TC/TD/TR':'외코드';
+        const ws=wb.Sheets[sn];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,cellDates:true});
+        for(let i=2;i<rows.length;i++){
+          const r=rows[i];
+          if(!r||r.length<4) continue;
+          const dv=r[0];
+          if(!dv||!(dv instanceof Date)) continue;
+          const dly=r[6];
+          if(!dly&&dly!==0) continue;
+          let ata=null;
+          try{ata=r[3]?Math.round(parseFloat(r[3])):null;}catch{}
+          const cr=r[7];
+          const codes=[];
+          if(cr){String(cr).split('\n').forEach(l=>{const m=l.trim().match(/^([A-Z]{2})/);if(m)codes.push(m[1])});}
+          ALL.push({
+            date:`${dv.getFullYear()}-${String(dv.getMonth()+1).padStart(2,'0')}-${String(dv.getDate()).padStart(2,'0')}`,
+            month:dv.getMonth()+1,year:dv.getFullYear(),
+            type:sv(r[1]),ac:sv(r[2]),ata,ataName:ata?(AN[ata]||'ATA '+ata):'',
+            flt:sv(r[4]),sta:sv(r[5]),dly:sv(r[6]),
+            codes,primary:codes[0]||'',
+            desc:sv(r[8]).slice(0,130),sheet:label,
+          });
+        }
+      });
+
+      // Show dashboard
+      document.getElementById('upScreen').classList.add('hidden');
+      document.getElementById('dash').classList.remove('hidden');
+      document.getElementById('hStat').classList.remove('hidden');
+      document.getElementById('hBtn').classList.remove('hidden');
+      const yrs=[...new Set(ALL.map(d=>d.year))].sort();
+      document.getElementById('hYear').textContent=yrs.join('·');
+      document.getElementById('hTotal').textContent=ALL.length;
+
+      buildSelects();
+      filtered=[...ALL];
+      sortArr(filtered);
+      refresh(ALL,filtered);
+
+    }catch(e){alert('파일 오류: '+e.message);}
+  };
+  r.readAsArrayBuffer(file);
+}
+function sv(v){return(!v&&v!==0)?'':String(v).replace(/\r?\n/g,' ').trim();}
+
+/* ──────────────────────────────
+   Selects
+────────────────────────────── */
+function buildSelects(){
+  const mos=[...new Set(ALL.map(d=>d.month))].sort((a,b)=>a-b);
+  const ms=document.getElementById('fMo');
+  ms.innerHTML='<option value="">전체 월</option>';
+  mos.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m+'월';ms.appendChild(o);});
+
+  const tys=[...new Set(ALL.map(d=>d.type).filter(Boolean))].sort();
+  const ts=document.getElementById('fTy');
+  ts.innerHTML='<option value="">전체 기종</option>';
+  tys.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;ts.appendChild(o);});
+
+  const cos=[...new Set(ALL.map(d=>d.primary).filter(Boolean))].sort();
+  const cs=document.getElementById('fCo');
+  cs.innerHTML='<option value="">전체 DLY코드</option>';
+  cos.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;cs.appendChild(o);});
+}
+
+/* ──────────────────────────────
+   Filter
+────────────────────────────── */
+function applyF(){
+  const s=document.getElementById('fSrc').value.toLowerCase();
+  const sh=document.getElementById('fSh').value;
+  const mo=document.getElementById('fMo').value;
+  const ty=document.getElementById('fTy').value;
+  const co=document.getElementById('fCo').value;
+  filtered=ALL.filter(d=>{
+    if(sh&&d.sheet!==sh) return false;
+    if(mo&&d.month!==+mo) return false;
+    if(ty&&d.type!==ty) return false;
+    if(co&&d.primary!==co) return false;
+    if(s&&!`${d.flt}${d.ac}${d.desc}${d.sta}${d.ataName}`.toLowerCase().includes(s)) return false;
+    return true;
+  });
+  sortArr(filtered);
+  refresh(filtered,filtered);
+  document.getElementById('frCnt').textContent=`${filtered.length} / ${ALL.length}건`;
+}
+function resetF(){
+  ['fSrc','fSh','fMo','fTy','fCo'].forEach(id=>{const e=document.getElementById(id);e.value='';});
+  filtered=[...ALL];sortArr(filtered);refresh(ALL,filtered);
+  document.getElementById('frCnt').textContent='';
+}
+
+/* ──────────────────────────────
+   Sort
+────────────────────────────── */
+function srt(k){
+  sortState.k===k?sortState.a=!sortState.a:(sortState={k,a:true});
+  document.querySelectorAll('th[id^="th-"]').forEach(th=>{
+    th.classList.remove('on');
+    th.textContent=th.textContent.replace(/ [▲▼↕]$/,' ↕');
+  });
+  const th=document.getElementById('th-'+k);
+  if(th){th.classList.add('on');th.textContent=th.textContent.replace(/ [▲▼↕]$/,sortState.a?' ▲':' ▼');}
+  sortArr(filtered);renderTable(filtered);
+}
+function sortArr(arr){
+  arr.sort((a,b)=>{
+    let va=a[sortState.k]||'',vb=b[sortState.k]||'';
+    if(typeof va==='number') return sortState.a?va-vb:vb-va;
+    return sortState.a?String(va).localeCompare(String(vb),'ko'):String(vb).localeCompare(String(va),'ko');
+  });
+}
+
+/* ──────────────────────────────
+   Refresh (KPI + Charts + Table)
+────────────────────────────── */
+function refresh(data,rows){
+  updateKPI(data);
+  buildCharts(data);
+  renderTable(rows);
+}
+
+/* ──────────────────────────────
+   KPI
+────────────────────────────── */
+function updateKPI(data){
+  const tc=data.filter(d=>d.sheet==='TC/TD/TR').length;
+  const ac={},cc={};
+  data.forEach(d=>{
+    if(d.ata) ac[d.ata]=(ac[d.ata]||0)+1;
+    if(d.primary) cc[d.primary]=(cc[d.primary]||0)+1;
+  });
+  const ta=Object.entries(ac).sort((a,b)=>b[1]-a[1])[0];
+  const tc2=Object.entries(cc).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('kTotal').textContent=data.length;
+  document.getElementById('kTc').textContent=tc;
+  document.getElementById('kEtc').textContent=data.length-tc;
+  document.getElementById('hTotal').textContent=data.length;
+  if(ta){document.getElementById('kAta').textContent=ta[0];document.getElementById('kAtaS').textContent=(AN[+ta[0]]||'')+' · '+ta[1]+'건';}
+  if(tc2){document.getElementById('kCode').textContent=tc2[0];document.getElementById('kCodeS').textContent=tc2[1]+'건';}
+}
+
+/* ──────────────────────────────
+   Charts
+────────────────────────────── */
+Chart.defaults.color='#9CA3AF';
+Chart.defaults.font.family="'Figtree',sans-serif";
+Chart.defaults.font.size=11;
+Chart.defaults.plugins.tooltip.backgroundColor='#111318';
+Chart.defaults.plugins.tooltip.titleColor='#F9FAFB';
+Chart.defaults.plugins.tooltip.bodyColor='#D1D5DB';
+Chart.defaults.plugins.tooltip.padding=12;
+Chart.defaults.plugins.tooltip.cornerRadius=8;
+Chart.defaults.plugins.tooltip.borderColor='rgba(255,255,255,.08)';
+Chart.defaults.plugins.tooltip.borderWidth=1;
+
+const G='rgba(0,0,0,.06)';
+
+function destroyAll(){Object.values(charts).forEach(c=>c&&c.destroy());charts={};}
+
+function buildCharts(data){
+  destroyAll();
+  const months=[...new Set(data.map(d=>d.month))].sort((a,b)=>a-b);
+  const ml=months.map(m=>m+'월');
+
+  /* 1. Monthly Stacked Bar */
+  charts.m=new Chart(document.getElementById('cM'),{
+    type:'bar',
+    data:{
+      labels:ml,
+      datasets:[
+        {label:'TC/TD/TR',data:months.map(m=>data.filter(d=>d.month===m&&d.sheet==='TC/TD/TR').length),backgroundColor:'#EF4444',borderRadius:6,borderSkipped:false},
+        {label:'외 코드', data:months.map(m=>data.filter(d=>d.month===m&&d.sheet==='외코드').length),backgroundColor:'#93C5FD',borderRadius:6,borderSkipped:false},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#6B7280',boxWidth:10,padding:16,font:{size:11}}}},
+      scales:{
+        x:{stacked:true,grid:{display:false},ticks:{color:'#9CA3AF'}},
+        y:{stacked:true,grid:{color:G},ticks:{color:'#9CA3AF',stepSize:2},border:{display:false}},
+      }
+    }
+  });
+
+  /* 2. DLY Code Doughnut */
+  const cc={};
+  data.forEach(d=>{if(d.primary)cc[d.primary]=(cc[d.primary]||0)+1;});
+  const ce=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  charts.d=new Chart(document.getElementById('cD'),{
+    type:'doughnut',
+    data:{
+      labels:ce.map(e=>e[0]),
+      datasets:[{data:ce.map(e=>e[1]),backgroundColor:ce.map(e=>CC(e[0])),borderColor:'#fff',borderWidth:3,hoverOffset:10}]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{
+        legend:{position:'right',labels:{color:'#6B7280',boxWidth:10,padding:10,font:{size:11}}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw}건 (${Math.round(ctx.raw/data.length*100)}%)`}},
+      }
+    }
+  });
+
+  /* 3. ATA Horizontal Bar */
+  const ac={};
+  data.forEach(d=>{if(d.ata)ac[d.ata]=(ac[d.ata]||0)+1;});
+  const ae=Object.entries(ac).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const acols=['#EF4444','#F97316','#EAB308','#22C55E','#14B8A6','#3B82F6','#8B5CF6','#EC4899','#F43F5E','#06B6D4'];
+  charts.a=new Chart(document.getElementById('cA'),{
+    type:'bar',
+    data:{
+      labels:ae.map(([k])=>`${k}  ${AN[+k]||'ATA '+k}`),
+      datasets:[{data:ae.map(e=>e[1]),backgroundColor:acols,borderRadius:5,borderSkipped:false}]
+    },
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:G},ticks:{color:'#9CA3AF',stepSize:1},border:{display:false}},
+        y:{grid:{display:false},ticks:{color:'#6B7280',font:{size:10}}},
+      }
+    }
+  });
+
+  /* 4. Type Doughnut */
+  const tc2={};
+  data.forEach(d=>{if(d.type)tc2[d.type]=(tc2[d.type]||0)+1;});
+  const te=Object.entries(tc2).sort((a,b)=>b[1]-a[1]);
+  const tcp={B738:'#3B82F6',B38M:'#10B981',A332:'#8B5CF6',A333:'#EAB308',B777:'#EF4444'};
+  charts.t=new Chart(document.getElementById('cT'),{
+    type:'doughnut',
+    data:{
+      labels:te.map(e=>e[0]),
+      datasets:[{data:te.map(e=>e[1]),backgroundColor:te.map(([t])=>tcp[t]||'#9CA3AF'),borderColor:'#fff',borderWidth:3,hoverOffset:10}]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,cutout:'54%',
+      plugins:{
+        legend:{position:'bottom',labels:{color:'#6B7280',boxWidth:10,padding:10,font:{size:11}}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw}건 (${Math.round(ctx.raw/data.length*100)}%)`}},
+      }
+    }
+  });
+
+  /* 5. Code × Month Line */
+  const top5=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
+  charts.l=new Chart(document.getElementById('cL'),{
+    type:'line',
+    data:{
+      labels:ml,
+      datasets:top5.map(code=>({
+        label:code,
+        data:months.map(m=>data.filter(d=>d.month===m&&d.primary===code).length),
+        borderColor:CC(code),
+        backgroundColor:CC(code)+'20',
+        borderWidth:2.5,pointRadius:5,pointHoverRadius:7,
+        tension:.35,fill:false,
+      }))
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#6B7280',boxWidth:10,padding:12,font:{size:11}}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#9CA3AF'}},
+        y:{grid:{color:G},ticks:{color:'#9CA3AF',stepSize:1},beginAtZero:true,border:{display:false}},
+      }
+    }
+  });
+}
+
+/* ──────────────────────────────
+   Table
+────────────────────────────── */
+function cpill(c){const cls={TC:'TC',TD:'TD',TR:'TR',TN:'TN',RO:'RO',FM:'FM'}[c]||'XX';return `<span class="pill ${cls}">${esc(c)}</span>`;}
+function tpill(t){const cls=['B738','B38M','A332','A333','B777'].includes(t)?t:'';return `<span class="tp ${cls}">${esc(t)}</span>`;}
+function dlyCls(d){if(!d||!d.includes('+')) return '';const h=parseInt(d);return h>=3?'d-long':h>=1?'d-mid':'';}
+
+function renderTable(items){
+  const tb=document.getElementById('tBody');
+  if(!items.length){
+    tb.innerHTML=`<tr><td colspan="10" style="text-align:center;padding:48px;color:#9CA3AF;font-size:13px">조건에 맞는 항목이 없습니다</td></tr>`;
+    document.getElementById('tFoot').textContent='0건';return;
+  }
+  tb.innerHTML=items.map(d=>`<tr>
+    <td style="font-family:'Courier New',monospace;font-size:11px;color:#6B7280;white-space:nowrap">${esc(d.date)}</td>
+    <td>${tpill(d.type)}</td>
+    <td style="font-family:'Courier New',monospace;font-size:11px;white-space:nowrap">${esc(d.ac)}</td>
+    <td><span class="ata-t">${d.ata||'—'}</span><div class="ata-n">${esc(d.ataName)}</div></td>
+    <td style="font-weight:600;font-size:12px">${esc(d.flt)}</td>
+    <td style="font-size:11px;color:#6B7280">${esc(d.sta)}</td>
+    <td class="${dlyCls(d.dly)}" style="font-family:'Courier New',monospace;font-size:12px">${esc(d.dly)}</td>
+    <td style="white-space:nowrap">${d.codes.map(c=>cpill(c)).join('')}</td>
+    <td style="font-size:10px;color:#9CA3AF;white-space:nowrap">${esc(d.sheet)}</td>
+    <td><div class="desc-c" title="${esc(d.desc)}">${esc(d.desc)}</div></td>
+  </tr>`).join('');
+  document.getElementById('tFoot').textContent=`총 ${items.length}건`;
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>
